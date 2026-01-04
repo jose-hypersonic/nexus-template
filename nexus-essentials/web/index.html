@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Character Selection</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="teleport-overlay" id="teleport-overlay">
+        <div class="swirl"></div>
+    </div>
+
+    <div id="app" class="hidden">
+        <div class="screen" id="selection-screen">
+            <div class="selection-container">
+                <div class="selection-header">
+                    <h1>Select Identity</h1>
+                </div>
+                
+                <div class="slots-grid">
+                    <div class="slot" id="slot-1" onclick="handleSlotClick(1)">
+                        <div class="slot-content">
+                            <div class="slot-icon">+</div>
+                            <p>New Identity</p>
+                        </div>
+                    </div>
+                    <div class="slot" id="slot-2" onclick="handleSlotClick(2)">
+                        <div class="slot-content">
+                            <div class="slot-icon">+</div>
+                            <p>New Identity</p>
+                        </div>
+                    </div>
+                    <div class="slot" id="slot-3" onclick="handleSlotClick(3)">
+                        <div class="slot-content">
+                            <div class="slot-icon">+</div>
+                            <p>New Identity</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="screen hidden" id="creation-screen">
+            <div class="questionnaire-container">
+                <div class="questionnaire">
+                    <div class="question-text" id="question-text"></div>
+                    
+                    <div class="input-container hidden" id="input-container">
+                        <input type="text" id="current-input" autocomplete="off">
+                        <div class="input-line"></div>
+                    </div>
+                    
+                    <div class="nav-buttons hidden" id="nav-buttons">
+                        <button class="nav-btn" id="back-btn" onclick="previousStep()">Back</button>
+                        <button class="nav-btn primary" id="next-btn" onclick="nextStep()">Next</button>
+                    </div>
+                    
+                    <div class="step-indicator">
+                        <span class="dot active"></span>
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const app = document.getElementById('app');
+        const selectionScreen = document.getElementById('selection-screen');
+        const creationScreen = document.getElementById('creation-screen');
+        
+        let characters = [null, null, null];
+        let currentSlot = null;
+        let currentStep = 0;
+        const formData = {};
+        
+        const questions = [
+            { 
+                text: "What would you like to be called?", 
+                field: "firstName", 
+                type: "text",
+                placeholder: "First name"
+            },
+            { 
+                text: "And your family name?", 
+                field: "lastName", 
+                type: "text",
+                placeholder: "Last name"
+            },
+            { 
+                text: "When were you born?", 
+                field: "dob", 
+                type: "date",
+                placeholder: ""
+            },
+            { 
+                text: "Where do you call home?", 
+                field: "country", 
+                type: "text",
+                placeholder: "Country"
+            }
+        ];
+
+        window.addEventListener('message', function (event) {
+            const data = event.data;
+            if (!data || !data.name) return;
+
+            const eventName = data.name;
+            const args = data.args;
+
+            switch (eventName) {
+                case 'openCharacterSelect':
+                    loadCharacters(args);
+                    showSelection();
+                    break;
+                case 'characterCreated':
+                    handleCharacterCreated(args);
+                    break;
+                case 'charactersUpdated':
+                    loadCharacters(args);
+                    updateAllSlots();
+                    break;
+            }
+        });
+
+        function loadCharacters(charArray) {
+            characters = [null, null, null];
+            if (Array.isArray(charArray)) {
+                charArray.forEach(char => {
+                    if (char && char.slot >= 1 && char.slot <= 3) {
+                        characters[char.slot - 1] = char;
+                    }
+                });
+            }
+        }
+
+        function showSelection() {
+            selectionScreen.classList.remove('hidden');
+            creationScreen.classList.add('hidden');
+            app.classList.remove('hidden');
+            updateAllSlots();
+        }
+
+        function showCreation(slot) {
+            currentSlot = slot;
+            selectionScreen.classList.add('hidden');
+            creationScreen.classList.remove('hidden');
+            currentStep = 0;
+            Object.keys(formData).forEach(key => delete formData[key]);
+            setTimeout(() => startQuestion(), 300);
+        }
+
+        function updateAllSlots() {
+            for (let i = 1; i <= 3; i++) {
+                updateSlot(i);
+            }
+        }
+
+        function updateSlot(slotNum) {
+            const slot = document.getElementById(`slot-${slotNum}`);
+            const char = characters[slotNum - 1];
+
+            if (char) {
+                slot.classList.add('filled');
+                slot.innerHTML = `
+                    <div class="slot-content">
+                        <div class="char-initials">${char.firstName.charAt(0)}${char.lastName.charAt(0)}</div>
+                        <p class="char-name">${char.firstName} ${char.lastName}</p>
+                        <p class="char-meta">${char.dob}</p>
+                        <p class="char-meta">${char.country}</p>
+                    </div>
+                    <button class="delete-btn" onclick="deleteCharacter(event, ${slotNum})">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                        </svg>
+                    </button>
+                `;
+                slot.onclick = () => selectCharacter(slotNum);
+            } else {
+                slot.classList.remove('filled');
+                slot.innerHTML = `
+                    <div class="slot-content">
+                        <div class="slot-icon">+</div>
+                        <p>New Identity</p>
+                    </div>
+                `;
+                slot.onclick = () => handleSlotClick(slotNum);
+            }
+        }
+
+        function handleSlotClick(slotNum) {
+            showCreation(slotNum);
+        }
+
+        function selectCharacter(slotNum) {
+            console.log('clicked on identity', slotNum);
+            hEvent('selectCharacter', { slot: slotNum });
+            playTeleportAnimation();
+        }
+
+        function deleteCharacter(event, slotNum) {
+            event.stopPropagation();
+            if (confirm('Delete this character?')) {
+                hEvent('deleteCharacter', { slot: slotNum });
+            }
+        }
+
+        function playTeleportAnimation() {
+            const overlay = document.getElementById('teleport-overlay');
+            const app = document.getElementById('app');
+            
+            overlay.classList.add('active');
+            
+         
+                app.classList.add('hidden');
+                overlay.classList.remove('active');
+                hEvent('removeInput', {});
+         
+        }
+
+        function typeWriter(text, element, callback) {
+            let index = 0;
+            element.textContent = '';
+            element.classList.add('typing');
+            
+            function type() {
+                if (index < text.length) {
+                    element.textContent += text.charAt(index);
+                    index++;
+                    setTimeout(type, 30);
+                } else {
+                    element.classList.remove('typing');
+                    if (callback) callback();
+                }
+            }
+            
+            type();
+        }
+
+        function startQuestion() {
+            const questionText = document.getElementById('question-text');
+            const inputContainer = document.getElementById('input-container');
+            const navButtons = document.getElementById('nav-buttons');
+            const currentInput = document.getElementById('current-input');
+            const backBtn = document.getElementById('back-btn');
+            const nextBtn = document.getElementById('next-btn');
+            
+            inputContainer.classList.add('hidden');
+            navButtons.classList.add('hidden');
+            updateStepIndicator();
+            
+            const question = questions[currentStep];
+            
+            typeWriter(question.text, questionText, () => {
+                setTimeout(() => {
+                    currentInput.type = question.type;
+                    currentInput.placeholder = question.placeholder;
+                    currentInput.value = formData[question.field] || '';
+                    
+                    inputContainer.classList.remove('hidden');
+                    currentInput.focus();
+                    
+                    setTimeout(() => {
+                        navButtons.classList.remove('hidden');
+                        backBtn.style.visibility = currentStep === 0 ? 'hidden' : 'visible';
+                        nextBtn.textContent = currentStep === questions.length - 1 ? 'Create' : 'Next';
+                    }, 200);
+                }, 400);
+            });
+        }
+
+        function updateStepIndicator() {
+            const dots = document.querySelectorAll('.dot');
+            dots.forEach((dot, index) => {
+                if (index === currentStep) {
+                    dot.classList.add('active');
+                } else {
+                    dot.classList.remove('active');
+                }
+            });
+        }
+
+        function nextStep() {
+            const currentInput = document.getElementById('current-input');
+            const question = questions[currentStep];
+            
+            if (!currentInput.value.trim()) {
+                currentInput.classList.add('error');
+                setTimeout(() => currentInput.classList.remove('error'), 300);
+                return;
+            }
+            
+            formData[question.field] = currentInput.value;
+            
+            if (currentStep === questions.length - 1) {
+                submitCreation();
+            } else {
+                const creationScreen = document.getElementById('creation-screen');
+                creationScreen.classList.add('fade-out');
+                
+                setTimeout(() => {
+                    currentStep++;
+                    creationScreen.classList.remove('fade-out');
+                    startQuestion();
+                }, 300);
+            }
+        }
+
+        function previousStep() {
+            if (currentStep > 0) {
+                const currentInput = document.getElementById('current-input');
+                const question = questions[currentStep];
+                formData[question.field] = currentInput.value;
+                
+                const creationScreen = document.getElementById('creation-screen');
+                creationScreen.classList.add('fade-out');
+                
+                setTimeout(() => {
+                    currentStep--;
+                    creationScreen.classList.remove('fade-out');
+                    startQuestion();
+                }, 300);
+            }
+        }
+
+        function submitCreation() {
+            hEvent("createCharacter", {
+                slot: currentSlot,
+                firstName: formData.firstName,
+                lastName: formData.lastName,
+                dob: formData.dob,
+                country: formData.country
+            });
+        }
+
+        function handleCharacterCreated(char) {
+            if (char && char.slot >= 1 && char.slot <= 3) {
+                characters[char.slot - 1] = char;
+            }
+            showSelection();
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus RPG Inventory</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;600;700&display=swap');
+
+        :root {
+            /* Cyberpunk/Sci-Fi Theme Palette */
+            --bg-base: #050508;
+            --bg-panel: rgba(10, 12, 18, 0.95);
+            --bg-slot: rgba(20, 25, 35, 0.6);
+            
+            --border-dim: rgba(255, 255, 255, 0.05);
+            --border-glow: rgba(0, 240, 255, 0.4);
+            
+            --accent-cyan: #00f0ff;
+            --accent-purple: #bd00ff;
+            --accent-gold: #fcee0a;
+            --accent-red: #ff003c;
+            
+            --text-main: #e0f0ff;
+            --text-dim: #64748b;
+            
+            --slot-size: 80px;
+            --slot-gap: 8px;
+            
+            /* Rarity Colors */
+            --rarity-common: #6b7280;
+            --rarity-uncommon: #10b981;
+            --rarity-rare: #3b82f6;
+            --rarity-epic: #a855f7;
+            --rarity-legendary: #fbbf24;
+            --rarity-mythic: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            background: transparent;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Rajdhani', sans-serif;
+            overflow: hidden;
+            color: var(--text-main);
+        }
+
+        .inventory-container {
+            display: none;
+            width: 780px;
+            height: 570px;
+            background: 
+                linear-gradient(135deg, rgba(5, 5, 8, 0.85), rgba(15, 18, 25, 0.80)),
+                repeating-linear-gradient(45deg, transparent 0, transparent 10px, rgba(0, 240, 255, 0.02) 10px, rgba(0, 240, 255, 0.02) 20px);
+            border: 1px solid var(--border-dim);
+            /* Double border effect using box-shadow */
+            box-shadow: 
+                0 0 0 1px rgba(0, 0, 0, 0.5),
+                0 0 0 2px rgba(255, 255, 255, 0.1),
+                0 0 60px rgba(0, 0, 0, 0.8);
+            
+            position: relative;
+            padding: 20px 30px 5px 20px;
+            
+            /* Clip corners for sci-fi look */
+            clip-path: polygon(
+                20px 0, 100% 0, 
+                100% calc(100% - 20px), calc(100% - 20px) 100%, 
+                0 100%, 0 20px
+            );
+            
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            
+            animation: holoFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes holoFadeIn {
+            from { 
+                opacity: 0; 
+                transform: scale(0.95) translateY(10px); 
+                filter: blur(10px);
+            }
+            to { 
+                opacity: 1; 
+                transform: scale(1) translateY(0); 
+                filter: blur(0);
+            }
+        }
+
+        /* --- Header --- */
+        .inventory-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 8px;
+            margin-bottom: 8px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.05);
+            position: relative;
+            min-height: 56px;
+        }
+        
+        .inventory-header::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            right: 0;
+            width: 100px;
+            height: 2px;
+            background: #fff;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-container img {
+            width: 120px;
+            height: 120px;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 12px rgba(255, 255, 255, 0.3));
+            opacity: 0.7;
+        }
+
+        .weight-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .weight-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .weight-val {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        /* --- Main Grid Area --- */
+        .inventory-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow: hidden; /* manage scroll inside grid */
+            padding-bottom: 20px;
+        }
+
+        .grid-wrapper {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .grid-wrapper::-webkit-scrollbar {
+            display: none;
+        }
+
+        .inventory-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 80px);
+            grid-template-rows: repeat(4, 80px);
+            gap: 10px;
+        }
+
+        /* --- Hotbar --- */
+        .hotbar-section {
+            display: none;
+        }
+
+        .hotbar-grid {
+            display: none;
+        }
+
+        /* --- Slot Styling --- */
+        .slot {
+            width: 80px;
+            height: 80px;
+            background: var(--bg-slot);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            position: relative;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            
+            /* Corner accents - Bottom Right Clip */
+            clip-path: polygon(
+                0 0, 100% 0, 
+                100% calc(100% - 10px), calc(100% - 10px) 100%, 
+                0 100%
+            );
+        }
+
+        .slot::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, rgba(255, 255, 255, 0.05), transparent 70%);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .slot:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(40, 45, 60, 0.8);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        
+        .slot:hover::before {
+            opacity: 1;
+        }
+
+        .slot.drag-over {
+            border-color: rgba(255, 255, 255, 0.5);
+            z-index: 10;
+        }
+
+        .slot.rarity-common::before { 
+            background: linear-gradient(to top, rgba(107, 114, 128, 0.4), transparent);
+            opacity: 1;
+        }
+        .slot.rarity-uncommon::before { 
+            background: linear-gradient(to top, rgba(16, 185, 129, 0.4), transparent);
+            opacity: 1;
+        }
+        .slot.rarity-rare::before { 
+            background: linear-gradient(to top, rgba(59, 130, 246, 0.4), transparent);
+            opacity: 1;
+        }
+        .slot.rarity-epic::before { 
+            background: linear-gradient(to top, rgba(168, 85, 247, 0.4), transparent);
+            opacity: 1;
+        }
+        .slot.rarity-legendary::before { 
+            background: linear-gradient(to top, rgba(251, 191, 36, 0.5), transparent);
+            opacity: 1;
+        }
+        .slot.rarity-mythic::before { 
+            background: linear-gradient(to top, rgba(239, 68, 68, 0.5), transparent);
+            opacity: 1;
+        }
+
+        .item {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            cursor: pointer;
+            border-radius: 12px;
+        }
+
+        .item.rarity-common {
+            background: radial-gradient(circle at center, rgba(107, 114, 128, 0.15), transparent 70%);
+        }
+        .item.rarity-uncommon {
+            background: radial-gradient(circle at center, rgba(16, 185, 129, 0.15), transparent 70%);
+        }
+        .item.rarity-rare {
+            background: radial-gradient(circle at center, rgba(59, 130, 246, 0.15), transparent 70%);
+        }
+        .item.rarity-epic {
+            background: radial-gradient(circle at center, rgba(168, 85, 247, 0.15), transparent 70%);
+        }
+        .item.rarity-legendary {
+            background: radial-gradient(circle at center, rgba(251, 191, 36, 0.2), transparent 70%);
+        }
+        .item.rarity-mythic {
+            background: radial-gradient(circle at center, rgba(239, 68, 68, 0.2), transparent 70%);
+        }
+
+        .item-icon-container {
+            font-size: 24px;
+            filter: drop-shadow(0 4px 4px rgba(0,0,0,0.5));
+            transition: transform 0.2s;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .item-icon-container img {
+            max-width: 48px;
+            max-height: 48px;
+        }
+        
+        .item:hover .item-icon-container {
+            transform: scale(1.1);
+        }
+
+        .item-count {
+            position: absolute;
+            top: 2px;
+            right: 4px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            color: #fff;
+            background: rgba(0,0,0,0.7);
+            padding: 1px 4px;
+            border-radius: 2px;
+            border: 1px solid rgba(255,255,255,0.1);
+            pointer-events: none;
+        }
+
+        /* Hotbar Specifics */
+        .slot-number {
+            position: absolute;
+            top: 2px;
+            left: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.5);
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        /* --- Tooltip --- */
+        .tooltip {
+            position: fixed;
+            z-index: 10000;
+            background: rgba(8, 10, 14, 0.98);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 16px;
+            width: 280px;
+            pointer-events: none; /* Passes through clicks */
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
+            
+            /* Tooltip border glow based on rarity (dynamic via JS) */
+            border-left: 3px solid #fff; 
+        }
+
+        .tooltip-header {
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 8px;
+            margin-bottom: 4px;
+        }
+
+        .tooltip-name {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .tooltip-type {
+            font-size: 11px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .tooltip-desc {
+            font-size: 13px;
+            color: #ccc;
+            line-height: 1.4;
+            font-style: italic;
+        }
+
+        .tooltip-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-top: 5px;
+            padding-top: 8px;
+            border-top: 1px dashed rgba(255,255,255,0.1);
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+        }
+        
+        .stat-label { color: var(--text-dim); }
+        .stat-value { color: var(--accent-cyan); font-weight: 600; }
+
+        .tooltip-rarity {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #fff;
+            background: rgba(255,255,255,0.1);
+            padding: 2px 6px;
+            border-radius: 2px;
+        }
+
+        .drag-ghost {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            width: var(--slot-size);
+            height: var(--slot-size);
+            opacity: 0.9;
+            /* Remove translate here, handle in JS for precision */
+            background: transparent;
+            display: none;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+            /* Centering the icon inside the ghost */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .drag-ghost .item-icon-container {
+            font-size: 40px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="inventory-container" id="inventory-ui">
+        <div class="inventory-header">
+            <div class="logo-container">
+                <img src="../images/helix.png" alt="Helix">
+            </div>
+            <div class="weight-container">
+                <span class="weight-label">Capacity</span>
+                <div class="weight-val">
+                    <span id="weight-current">0</span> / <span id="weight-max">100</span>
+                    <span style="font-size: 12px; color: rgba(255,255,255,0.5);">KG</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="inventory-body">
+            <div class="grid-wrapper">
+                <div class="inventory-grid" id="main-grid">
+                    <!-- JS Generated -->
+                </div>
+            </div>
+        </div>
+        </div>
+
+    <!-- Hover Tooltip -->
+    <div class="tooltip" id="tooltip">
+        <div class="tooltip-rarity" id="tt-rarity">Common</div>
+        <div class="tooltip-header">
+            <div class="tooltip-name" id="tt-name">Item Name</div>
+            <div class="tooltip-type" id="tt-type">Weapon</div>
+            </div>
+        <div class="tooltip-desc" id="tt-desc">Description goes here.</div>
+        <div class="tooltip-stats" id="tt-stats">
+            <div class="stat-row">
+                <span class="stat-label">Weight</span>
+                <span class="stat-value">1.5kg</span>
+            </div>
+            </div>
+        </div>
+
+    <!-- Drag Ghost -->
+    <div class="drag-ghost" id="drag-ghost"></div>
+
+    <script>
+        // --- Constants & Config ---
+        const GRID_SLOTS = 32; // 8x4 grid
+        const HOTBAR_SLOTS = 0; // Integrated into grid
+        
+        const RARITY_COLORS = {
+            common: '#6b7280',
+            uncommon: '#10b981',
+            rare: '#3b82f6',
+            epic: '#a855f7',
+            legendary: '#fbbf24',
+            mythic: '#ef4444'
+        };
+
+        // --- State ---
+        let inventory = { grid: [], hotbar: [] };
+        
+        // Dragging
+        let isDragging = false;
+        let dragSource = null; // { type, index, item }
+        
+        // Ghost Element
+        const dragGhost = document.getElementById('drag-ghost');
+        
+        // Tooltip Element
+        const tooltip = document.getElementById('tooltip');
+        
+        // Event Bridge
+        const originalHEvent = typeof hEvent !== 'undefined' ? hEvent : () => {};
+        window.hEvent = function(name, data) { originalHEvent(name, data || {}); };
+
+        window.addEventListener('message', (event) => {
+            if (!event.data || !event.data.name) return;
+            const { name, args } = event.data;
+
+            if (name === 'show') {
+                document.getElementById('inventory-ui').style.display = 'flex';
+                hEvent('getData', {});
+            } else if (name === 'hide') {
+                document.getElementById('inventory-ui').style.display = 'none';
+                hideTooltip();
+            } else if (name === 'inventoryData') {
+                inventory.grid = args.grid || new Array(GRID_SLOTS).fill(null);
+                // Hotbar is no longer rendered separately, but we might still receive it
+                render();
+            }
+        });
+
+        // --- Helper: Icon Renderer ---
+        function getIconHtml(item) {
+            // Check if icon is an image file (png/jpg)
+            if (item.icon && (item.icon.endsWith('.png') || item.icon.endsWith('.jpg') || item.icon.endsWith('.PNG'))) {
+                return `<div class="item-icon-container"><img src="../images/${item.icon}" style="width: 100%; height: 100%; object-fit: contain;"></div>`;
+            }
+            return `<div class="item-icon-container">${item.icon || '📦'}</div>`;
+        }
+
+        // --- Core Rendering ---
+        function render() {
+            renderGrid('main-grid', inventory.grid, 'grid');
+            updateWeight();
+        }
+
+        function renderGrid(elementId, items, type) {
+            const container = document.getElementById(elementId);
+            container.innerHTML = '';
+
+            items.forEach((item, index) => {
+                const slot = document.createElement('div');
+                slot.className = 'slot';
+                
+                if (item && item.rarity) {
+                    slot.classList.add(`rarity-${item.rarity.toLowerCase()}`);
+                }
+
+                slot.dataset.type = type;
+                slot.dataset.index = index;
+
+                slot.onmousedown = handleSlotMouseDown;
+                slot.onmouseup = handleSlotMouseUp;
+                slot.onmouseenter = (e) => {
+                    handleSlotMouseEnter(e);
+                    if (item && !isDragging) showTooltip(e, item);
+                };
+                slot.onmouseleave = (e) => {
+                    handleSlotMouseLeave(e);
+                    hideTooltip();
+                };
+
+                if (index < 8) {
+                    const numberLabel = document.createElement('div');
+                    numberLabel.className = 'slot-number';
+                    numberLabel.innerText = index + 1;
+                    slot.appendChild(numberLabel);
+                }
+
+                if (item) {
+                    const itemEl = document.createElement('div');
+                    itemEl.className = 'item';
+                    if (item.rarity) {
+                        itemEl.classList.add(`rarity-${item.rarity.toLowerCase()}`);
+                    }
+                    itemEl.innerHTML = getIconHtml(item);
+                    
+                    if (item.count > 1) {
+                        const countEl = document.createElement('div');
+                        countEl.className = 'item-count';
+                        countEl.innerText = item.count;
+                        itemEl.appendChild(countEl);
+                    }
+                    
+                    itemEl.oncontextmenu = (e) => {
+                        e.preventDefault();
+                        showContextMenu(e, item, type, index);
+                    };
+                    
+                    slot.appendChild(itemEl);
+                }
+
+                container.appendChild(slot);
+            });
+        }
+
+        function showContextMenu(e, item, type, index) {
+            // Create context menu if not exists
+            let menu = document.getElementById('context-menu');
+            if (!menu) {
+                menu = document.createElement('div');
+                menu.id = 'context-menu';
+                menu.style.position = 'fixed';
+                menu.style.background = 'rgba(10, 15, 20, 0.95)';
+                menu.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+                menu.style.padding = '5px 0';
+                menu.style.borderRadius = '4px';
+                menu.style.zIndex = '10001';
+                menu.style.minWidth = '120px';
+                document.body.appendChild(menu);
+                
+                // Close on click elsewhere
+                document.addEventListener('click', () => menu.style.display = 'none');
+            }
+            
+            menu.innerHTML = '';
+            
+            // USE Action
+            if (item.useable) {
+                const useBtn = document.createElement('div');
+                useBtn.innerText = 'Use';
+                useBtn.style.padding = '8px 16px';
+                useBtn.style.cursor = 'pointer';
+                useBtn.style.color = '#fff';
+                useBtn.style.fontSize = '14px';
+                useBtn.onmouseover = () => useBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+                useBtn.onmouseout = () => useBtn.style.background = 'transparent';
+                useBtn.onclick = () => {
+                    hEvent('useItem', { slotType: type, slotIndex: index });
+                    menu.style.display = 'none';
+                };
+                menu.appendChild(useBtn);
+            }
+            
+            // DROP Action
+            const dropBtn = document.createElement('div');
+            dropBtn.innerText = 'Drop';
+            dropBtn.style.padding = '8px 16px';
+            dropBtn.style.cursor = 'pointer';
+            dropBtn.style.color = '#ff5050';
+            dropBtn.style.fontSize = '14px';
+            dropBtn.onmouseover = () => dropBtn.style.background = 'rgba(255, 80, 80, 0.2)';
+            dropBtn.onmouseout = () => dropBtn.style.background = 'transparent';
+            dropBtn.onclick = () => {
+                hEvent('dropItem', { slotType: type, slotIndex: index });
+                menu.style.display = 'none';
+            };
+            menu.appendChild(dropBtn);
+            
+            menu.style.left = e.clientX + 'px';
+            menu.style.top = e.clientY + 'px';
+            menu.style.display = 'block';
+        }
+
+        function updateWeight() {
+            let total = 0;
+            [...inventory.grid].forEach(i => {
+                if(i) total += (i.weight * i.count);
+            });
+            document.getElementById('weight-current').innerText = total.toFixed(1);
+        }
+
+        // --- Drag Logic (Optimized) ---
+        
+        let mouseX = 0, mouseY = 0;
+        let rafId = null;
+
+        // Track global mouse position
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            
+            if (isDragging) {
+                if (!rafId) {
+                    rafId = requestAnimationFrame(updateGhostPosition);
+                }
+            }
+            
+            // Move tooltip if visible
+            if (tooltip.style.display === 'flex') {
+                updateTooltipPosition();
+            }
+        });
+
+        function updateGhostPosition() {
+            // Center the ghost on the mouse cursor
+            const size = 80; // --slot-size is 80px
+            dragGhost.style.left = (mouseX - size / 2) + 'px';
+            dragGhost.style.top = (mouseY - size / 2) + 'px';
+            rafId = null;
+        }
+
+        function updateTooltipPosition() {
+            const offset = 15;
+            // Bound checking logic could be added here
+            tooltip.style.left = (mouseX + offset) + 'px';
+            tooltip.style.top = (mouseY + offset) + 'px';
+        }
+
+        function handleSlotMouseDown(e) {
+            if (e.button !== 0) return; // Left click only
+            
+            const slot = e.currentTarget;
+            const type = slot.dataset.type;
+            const index = parseInt(slot.dataset.index);
+            const item = inventory.grid[index];
+
+            if (!item) return;
+
+            isDragging = true;
+            dragSource = { type, index, item };
+            hideTooltip(); // Hide tooltip when dragging starts
+
+            // Setup Ghost
+            dragGhost.innerHTML = getIconHtml(item);
+            dragGhost.style.display = 'flex'; // Ensure flex display for centering
+            updateGhostPosition(); // Initial pos
+            
+            // Visual feedback
+            slot.style.opacity = '0.5';
+        }
+
+        function handleSlotMouseUp(e) {
+            // Clean up hover class
+            e.currentTarget.classList.remove('drag-over');
+
+            if (!isDragging || !dragSource) return;
+
+            const targetSlot = e.currentTarget;
+            const targetType = targetSlot.dataset.type;
+            const targetIndex = parseInt(targetSlot.dataset.index);
+
+            // Execute Move
+            if (dragSource.type !== targetType || dragSource.index !== targetIndex) {
+                hEvent('moveItem', {
+                sourceType: dragSource.type,
+                sourceIndex: dragSource.index,
+                targetType: targetType,
+                targetIndex: targetIndex
+            });
+        }
+
+            stopDragging();
+        }
+
+        // Global mouseup to cancel drag if dropped outside
+        document.addEventListener('mouseup', (e) => {
+            if (isDragging) stopDragging();
+        });
+
+        function stopDragging() {
+            isDragging = false;
+            dragGhost.style.display = 'none';
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = null;
+            
+            // Re-render to clear opacity on source slot
+            render();
+            dragSource = null;
+        }
+
+        function handleSlotMouseEnter(e) {
+            if (isDragging) {
+                e.currentTarget.classList.add('drag-over');
+            }
+        }
+
+        function handleSlotMouseLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        // --- Tooltip Logic ---
+
+        function showTooltip(e, item) {
+            // Populate Data
+            document.getElementById('tt-name').innerText = item.name;
+            document.getElementById('tt-type').innerText = item.type;
+            document.getElementById('tt-desc').innerText = item.desc || "No description.";
+            document.getElementById('tt-rarity').innerText = item.rarity;
+            
+            // Colorize Border & Rarity Badge
+            const rarityColor = RARITY_COLORS[item.rarity.toLowerCase()] || '#fff';
+            tooltip.style.borderLeftColor = rarityColor;
+            document.getElementById('tt-rarity').style.color = rarityColor;
+
+            // Stats
+            const statsContainer = document.getElementById('tt-stats');
+            statsContainer.innerHTML = `
+                <div class="stat-row">
+                    <span class="stat-label">Weight</span>
+                    <span class="stat-value">${item.weight}kg</span>
+                </div>
+            `;
+            
+            // Add Health if applicable (example logic)
+            if (item.health) {
+                statsContainer.innerHTML += `
+                    <div class="stat-row">
+                        <span class="stat-label">Health</span>
+                        <span class="stat-value">${item.health}%</span>
+                    </div>
+                `;
+            }
+
+            // Show
+            tooltip.style.display = 'flex';
+            updateTooltipPosition();
+        }
+
+        function hideTooltip() {
+            tooltip.style.display = 'none';
+        }
+
+        // Key Listener for Close
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' || e.key === 'Tab') {
+                e.preventDefault(); // Prevent tab focus shifting
+                hEvent('close', {});
+            }
+        });
+
+    </script>
+</body>
+</html>

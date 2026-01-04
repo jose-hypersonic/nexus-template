@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: transparent;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #hud {
+            position: fixed;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%) translateX(-100px);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            opacity: 0;
+            transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        #hud.visible {
+            opacity: 1;
+            transform: translateY(-50%) translateX(0);
+        }
+
+        .player-name {
+            font-size: 12px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.9);
+            text-align: left;
+            margin-bottom: 8px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+            letter-spacing: 0.5px;
+        }
+
+        .stats-container {
+            display: flex;
+            gap: 8px;
+            flex-direction: column;
+        }
+
+        .stat-circle {
+            position: relative;
+            width: 56px;
+            height: 56px;
+            align-self: flex-start;
+        }
+
+        .stat-circle svg {
+            transform: rotate(-90deg);
+            width: 100%;
+            height: 100%;
+        }
+
+        .circle-bg {
+            fill: none;
+            stroke: rgba(0, 0, 0, 0.6);
+            stroke-width: 5;
+        }
+
+        .circle-progress {
+            fill: none;
+            stroke-width: 5;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.3s ease;
+        }
+
+        .stat-icon-bg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stat-icon {
+            width: 22px;
+            height: 22px;
+            filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.8));
+            transform: rotate(90deg);
+        }
+
+        .stat-icon svg {
+            width: 100%;
+            height: 100%;
+            fill: white;
+        }
+
+        .health-stat .circle-progress { stroke: #ff5555; }
+        .health-stat .stat-icon-bg { background: rgba(255, 85, 85, 0.25); }
+
+        .hunger-stat .circle-progress { stroke: #ffaa55; }
+        .hunger-stat .stat-icon-bg { background: rgba(255, 170, 85, 0.25); }
+
+        .thirst-stat .circle-progress { stroke: #5599ff; }
+        .thirst-stat .stat-icon-bg { background: rgba(85, 153, 255, 0.25); }
+
+        .stress-stat .circle-progress { stroke: #aa55ff; }
+        .stress-stat .stat-icon-bg { background: rgba(170, 85, 255, 0.25); }
+
+        .sickness-stat .circle-progress { stroke: #55ff88; }
+        .sickness-stat .stat-icon-bg { background: rgba(85, 255, 136, 0.25); }
+
+        #compass-container {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 60px;
+            overflow: hidden;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        #compass-container.visible {
+            opacity: 1;
+        }
+
+        #compass {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            height: 100%;
+            display: flex;
+            align-items: flex-end;
+            transition: transform 0.1s linear;
+            white-space: nowrap;
+        }
+
+        .compass-mark {
+            position: relative;
+            width: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .compass-tick {
+            width: 2px;
+            background: rgba(255, 255, 255, 0.6);
+            margin-bottom: 4px;
+        }
+
+        .compass-tick.small { height: 12px; }
+        .compass-tick.medium { height: 18px; }
+        .compass-tick.large { height: 28px; }
+
+        .compass-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+            margin-bottom: 2px;
+        }
+
+        .compass-center-indicator {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 3px;
+            height: 100%;
+            background: linear-gradient(to bottom, 
+                rgba(0, 0, 0, 0) 0%, 
+                rgba(0, 0, 0, 1) 50%, 
+                rgba(0, 0, 0, 0) 100%);
+            pointer-events: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div id="compass-container">
+        <div class="compass-center-indicator"></div>
+        <div id="compass"></div>
+    </div>
+
+    <div id="hud">
+        <div class="player-name" id="playerName">Loading...</div>
+        <div class="stats-container">
+            <div class="stat-circle health-stat">
+                <svg viewBox="0 0 50 50">
+                    <circle class="circle-bg" cx="25" cy="25" r="20"></circle>
+                    <circle class="circle-progress" cx="25" cy="25" r="20" 
+                            id="healthCircle"
+                            stroke-dasharray="125.6" 
+                            stroke-dashoffset="0"></circle>
+                </svg>
+                <div class="stat-icon-bg">
+                    <div class="stat-icon">
+                        <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                    </div>
+                </div>
+            </div>
+            <div class="stat-circle hunger-stat">
+                <svg viewBox="0 0 50 50">
+                    <circle class="circle-bg" cx="25" cy="25" r="20"></circle>
+                    <circle class="circle-progress" cx="25" cy="25" r="20" 
+                            id="hungerCircle"
+                            stroke-dasharray="125.6" 
+                            stroke-dashoffset="0"></circle>
+                </svg>
+                <div class="stat-icon-bg">
+                    <div class="stat-icon">
+                        <svg viewBox="0 0 24 24"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/></svg>
+                    </div>
+                </div>
+            </div>
+            <div class="stat-circle thirst-stat">
+                <svg viewBox="0 0 50 50">
+                    <circle class="circle-bg" cx="25" cy="25" r="20"></circle>
+                    <circle class="circle-progress" cx="25" cy="25" r="20" 
+                            id="thirstCircle"
+                            stroke-dasharray="125.6" 
+                            stroke-dashoffset="0"></circle>
+                </svg>
+                <div class="stat-icon-bg">
+                    <div class="stat-icon">
+                        <svg viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+                    </div>
+                </div>
+            </div>
+            <div class="stat-circle stress-stat">
+                <svg viewBox="0 0 50 50">
+                    <circle class="circle-bg" cx="25" cy="25" r="20"></circle>
+                    <circle class="circle-progress" cx="25" cy="25" r="20" 
+                            id="stressCircle"
+                            stroke-dasharray="125.6" 
+                            stroke-dashoffset="0"></circle>
+                </svg>
+                <div class="stat-icon-bg">
+                    <div class="stat-icon">
+                        <svg viewBox="0 0 24 24"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/></svg>
+                    </div>
+                </div>
+            </div>
+            <div class="stat-circle sickness-stat">
+                <svg viewBox="0 0 50 50">
+                    <circle class="circle-bg" cx="25" cy="25" r="20"></circle>
+                    <circle class="circle-progress" cx="25" cy="25" r="20" 
+                            id="sicknessCircle"
+                            stroke-dasharray="125.6" 
+                            stroke-dashoffset="0"></circle>
+                </svg>
+                <div class="stat-icon-bg">
+                    <div class="stat-icon">
+                        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-1.99.9-1.99 2L3 19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-6.99 13.53L11 14l2.01-2.53L15 14l-2.99 2.53zM13 12V7h-2v5h2zm0 2h-2v2h2v-2z"/></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const hud = document.getElementById('hud');
+        const playerName = document.getElementById('playerName');
+        const healthCircle = document.getElementById('healthCircle');
+        const hungerCircle = document.getElementById('hungerCircle');
+        const thirstCircle = document.getElementById('thirstCircle');
+        const stressCircle = document.getElementById('stressCircle');
+        const sicknessCircle = document.getElementById('sicknessCircle');
+        const compassContainer = document.getElementById('compass-container');
+        const compass = document.getElementById('compass');
+        
+        const circumference = 125.6;
+        
+        function updateCircle(circle, percentage) {
+            const offset = circumference - (percentage / 100) * circumference;
+            circle.style.strokeDashoffset = offset;
+        }
+
+        const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+        const degreesPerMark = 7.5;
+        const totalMarks = 48;
+
+        function createCompassMark(i) {
+            const mark = document.createElement('div');
+            mark.className = 'compass-mark';
+            
+            const angle = i * degreesPerMark;
+            const remainder45 = Math.abs(angle % 45);
+            const remainder22_5 = Math.abs(angle % 22.5);
+            
+            if (remainder45 < 0.01 || remainder45 > 44.99) {
+                const tick = document.createElement('div');
+                tick.className = 'compass-tick large';
+                mark.appendChild(tick);
+                
+                const label = document.createElement('div');
+                label.className = 'compass-label';
+                const normalizedAngle = ((Math.round(angle / 45) * 45) % 360 + 360) % 360;
+                const dirIndex = (normalizedAngle / 45) % 8;
+                label.textContent = directions[dirIndex];
+                mark.appendChild(label);
+            } else if (remainder22_5 < 0.01 || remainder22_5 > 22.49) {
+                const tick = document.createElement('div');
+                tick.className = 'compass-tick medium';
+                mark.appendChild(tick);
+            } else {
+                const tick = document.createElement('div');
+                tick.className = 'compass-tick small';
+                mark.appendChild(tick);
+            }
+            
+            return mark;
+        }
+
+        const repetitions = 50;
+        for (let i = -totalMarks * repetitions / 2; i < totalMarks * repetitions / 2; i++) {
+            compass.appendChild(createCompassMark(i));
+        }
+
+        const pixelsPerDegree = 30 / degreesPerMark;
+
+        function updateCompass(yaw) {
+            const offset = yaw * pixelsPerDegree;
+            compass.style.transform = `translateX(calc(-50% - ${offset}px))`;
+        }
+
+        window.addEventListener('message', (event) => {
+            const data = event.data;
+            if (!data || !data.name) return;
+
+            const eventName = data.name;
+            const args = data.args;
+
+            if (eventName !== 'updateCompass' && eventName !== 'updateStats') {
+                console.log('[HUD HTML] Event received:', eventName, args);
+            }
+
+            switch (eventName) {
+                case 'show':
+                    if (args && args.name) {
+                        playerName.textContent = args.name;
+                    }
+                    hud.classList.add('visible');
+                    compassContainer.classList.add('visible');
+                    console.log('[HUD HTML] HUD now visible');
+                    break;
+
+                case 'updateName':
+                    if (args && args.name) {
+                        playerName.textContent = args.name;
+                    }
+                    break;
+
+                case 'updateStats':
+                    if (!args) return;
+                    if (args.health !== undefined) updateCircle(healthCircle, args.health);
+                    if (args.hunger !== undefined) updateCircle(hungerCircle, args.hunger);
+                    if (args.thirst !== undefined) updateCircle(thirstCircle, args.thirst);
+                    if (args.stress !== undefined) updateCircle(stressCircle, args.stress);
+                    if (args.sickness !== undefined) updateCircle(sicknessCircle, args.sickness);
+                    break;
+
+                case 'updateCompass':
+                    if (args && args.yaw !== undefined) {
+                        updateCompass(args.yaw);
+                    }
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>
+
